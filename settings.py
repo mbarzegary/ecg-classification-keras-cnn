@@ -1,0 +1,1 @@
+db_path = "/home/mojtaba/ml/ecg/data/raw/csv/"
