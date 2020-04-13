@@ -4,9 +4,11 @@ import sklearn
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
+import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.models import load_model
+import tensorflow_federated as tff
 
 from tensorflow_privacy.privacy.analysis import compute_dp_sgd_privacy
 from tensorflow_privacy.privacy.optimizers.dp_optimizer import DPGradientDescentGaussianOptimizer
@@ -17,9 +19,10 @@ import settings
 
 import matplotlib.pyplot as plt
 import matplotlib
+import numpy as np
 
 
-def create_svm_model_name(model_path, winL, winR, do_preprocess, 
+def create_model_name(model_path, winL, winR, do_preprocess, 
     maxRR, use_RR, norm_RR, compute_morph,  
     leads_flag, reduced_DS, delimiter):
 
@@ -49,6 +52,91 @@ def create_svm_model_name(model_path, winL, winR, do_preprocess,
 
     return model_path
 
+
+def main_federated(winL=90, winR=90, do_preprocess=True, 
+    maxRR=True, use_RR=True, norm_RR=True, compute_morph={''}, reduced_DS = False, leads_flag = [1,0]):
+    print("Runing train_Keras.py for federated learning!")
+
+    db_path = settings.db_path
+    
+    # Load train data 
+    [tr_features, tr_labels, tr_patient_num_beats] = load_mit_db('DS1', winL, winR, do_preprocess,
+        maxRR, use_RR, norm_RR, compute_morph, db_path, reduced_DS, leads_flag)
+
+    # Load test data
+    [eval_features, eval_labels, eval_patient_num_beats] = load_mit_db('DS2', winL, winR, do_preprocess, 
+        maxRR, use_RR, norm_RR, compute_morph, db_path, reduced_DS, leads_flag)
+
+    scaler = StandardScaler()
+    scaler.fit(tr_features)
+    tr_features_scaled = scaler.transform(tr_features)
+    eval_features_scaled = scaler.transform(eval_features)
+
+    NUM_CLIENTS = 22
+    NUM_EPOCHS = 5
+    BATCH_SIZE = 20
+    SHUFFLE_BUFFER = 100
+    PREFETCH_BUFFER = 10
+    NUM_ROUNDS = 11
+
+    train_clients = np.array_split(tr_features_scaled, NUM_CLIENTS)
+    train_labels_clients = np.array_split(tr_labels, NUM_CLIENTS)
+    test_clients = np.array_split(eval_features_scaled, NUM_CLIENTS)
+    test_labels_clients = np.array_split(eval_labels, NUM_CLIENTS)
+
+    def preprocess(dataset):
+        return dataset.repeat(NUM_EPOCHS).shuffle(SHUFFLE_BUFFER).batch(BATCH_SIZE).prefetch(PREFETCH_BUFFER)
+
+    def make_federated_data(client_data, client_labels_data, client_ids):
+        return [
+            preprocess(tf.data.Dataset.from_tensor_slices((client_data[x], client_labels_data[x])))
+            for x in client_ids
+        ]
+
+
+    sample_clients = range(NUM_CLIENTS)
+    federated_train_data = make_federated_data(train_clients, train_labels_clients, sample_clients)
+
+
+    def create_keras_model():
+        mlp_model = Sequential()
+        mlp_model.add(Dense(100, input_dim=tr_features_scaled.shape[1], activation='relu'))
+        mlp_model.add(Dropout(0.5))
+        mlp_model.add(Dense(1, activation='sigmoid'))
+        return mlp_model
+
+    def model_fn():
+        keras_model = create_keras_model()
+        return tff.learning.from_keras_model(
+            keras_model,
+            input_spec=federated_train_data[0].element_spec,
+            loss=tf.keras.losses.BinaryCrossentropy(),
+            metrics=[tf.keras.metrics.BinaryAccuracy()])
+
+    iterative_process = tff.learning.build_federated_averaging_process(
+        model_fn,
+        client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.02),
+        server_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=1.0))
+
+    state = iterative_process.initialize()
+
+    for round_num in range(1, NUM_ROUNDS):
+        state, metrics = iterative_process.next(state, federated_train_data)
+        print('round {:2d}, metrics={}'.format(round_num, metrics))
+
+    evaluation = tff.learning.build_federated_evaluation(model_fn)
+
+    train_metrics = evaluation(state.model, federated_train_data)
+    print(str(train_metrics))
+
+    federated_test_data = make_federated_data(test_clients, test_labels_clients, sample_clients)
+    print(len(federated_test_data))
+
+    test_metrics = evaluation(state.model, federated_test_data)
+    print(str(test_metrics))
+
+
+
 def main_DP(winL=90, winR=90, do_preprocess=True, 
     maxRR=True, use_RR=True, norm_RR=True, compute_morph={''}, reduced_DS = False, leads_flag = [1,0]):
     print("Runing train_Keras.py for Differential Privacy!")
@@ -70,7 +158,7 @@ def main_DP(winL=90, winR=90, do_preprocess=True,
 
     model_path = db_path + 'keras_models/'
 
-    model_path = create_svm_model_name(model_path, winL, winR, do_preprocess,
+    model_path = create_model_name(model_path, winL, winR, do_preprocess,
         maxRR, use_RR, norm_RR, compute_morph,
         leads_flag, reduced_DS, '_')
 
@@ -155,7 +243,7 @@ def main(winL=90, winR=90, do_preprocess=True,
 
     model_path = db_path + 'keras_models/'
 
-    model_path = create_svm_model_name(model_path, winL, winR, do_preprocess,
+    model_path = create_model_name(model_path, winL, winR, do_preprocess,
         maxRR, use_RR, norm_RR, compute_morph,
         leads_flag, reduced_DS, '_')
 

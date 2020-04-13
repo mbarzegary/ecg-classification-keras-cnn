@@ -1,4 +1,4 @@
-from train_Keras import main, main_DP
+from train_Keras import main, main_DP, main_federated
 
 # Call different configurations for train_SVM.py 
 
@@ -15,5 +15,7 @@ leads_flag = [1,0] # MLII, V1
 use_RR = True
 norm_RR = False
 compute_morph = {'myMorph'} 
+
 # main(winL, winR, do_preprocess, maxRR, use_RR, norm_RR, compute_morph, reduced_DS, leads_flag)
-main_DP(winL, winR, do_preprocess, maxRR, use_RR, norm_RR, compute_morph, reduced_DS, leads_flag)
+# main_DP(winL, winR, do_preprocess, maxRR, use_RR, norm_RR, compute_morph, reduced_DS, leads_flag)
+main_federated(winL, winR, do_preprocess, maxRR, use_RR, norm_RR, compute_morph, reduced_DS, leads_flag)
