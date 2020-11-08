@@ -1,2 +1,7 @@
 .vscode/
+test/
+train/
+test-128/
+train-128/
+features/
 __pycache__

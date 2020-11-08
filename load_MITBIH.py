@@ -104,14 +104,36 @@ def load_mit_db(DS, winL, winR, do_preprocess, maxRR, use_RR, norm_RR, compute_m
         print(("Loading MIT BIH arr (" + DS + ") ..."))
 
         # ML-II
-        if reduced_DS == False:
-            DS1 = [101, 106, 108, 109, 112, 114, 115, 116, 118, 119, 122, 124, 201, 203, 205, 207, 208, 209, 215, 220, 223, 230]
-            DS2 = [100, 103, 105, 111, 113, 117, 121, 123, 200, 202, 210, 212, 213, 214, 219, 221, 222, 228, 231, 232, 233, 234]
+        # if reduced_DS == False:
+        #     DS1 = [101, 106, 108, 109, 112, 114, 115, 116, 118, 119, 122, 124, 201, 203, 205, 207, 208, 209, 215, 220, 223, 230]
+        #     DS2 = [100, 103, 105, 111, 113, 117, 121, 123, 200, 202, 210, 212, 213, 214, 219, 221, 222, 228, 231, 232, 233, 234]
 
-        # ML-II + V1
-        else:
-            DS1 = [101, 106, 108, 109, 112, 115, 118, 119, 201, 203, 205, 207, 208, 209, 215, 220, 223, 230]
-            DS2 = [105, 111, 113, 121, 200, 202, 210, 212, 213, 214, 219, 221, 222, 228, 231, 232, 233, 234]
+        # # ML-II + V1
+        # else:
+        #     DS1 = [101, 106, 108, 109, 112, 115, 118, 119, 201, 203, 205, 207, 208, 209, 215, 220, 223, 230]
+        #     DS2 = [105, 111, 113, 121, 200, 202, 210, 212, 213, 214, 219, 221, 222, 228, 231, 232, 233, 234]
+
+        
+        # uniform split into train and test
+        # DS1 = [100, 103, 108, 113, 115, 121, 123, 205, 230, 106, 119, 201, 208, 221, 233, 102, 107, 118, 212, 109, 207, 209, 222]
+        # DS2 = [101, 105, 112, 114, 122, 202, 219, 234, 116, 200, 203, 210, 215, 228, 204, 217, 124, 231, 111, 213, 220, 223, 232]
+
+        # non-uniform split into train and test
+        # DS1 = [100, 116, 101, 104, 103, 200, 105, 124, 203, 108, 210, 112, 113, 114, 115, 121, 122, 123, 202, 111, 106, 119, 220, 201, 208, 221, 233, 102, 107, 118, 212, 109, 209, 222]
+        # DS2 = [205, 219, 230, 234, 215, 228, 217, 231, 213, 223, 232]
+
+        # to be split using sklearn split function
+        # DS1 = [100, 116, 101, 104, 103, 200, 105, 124, 203, 108, 210, 112, 113, 114, 115, 121, 122, 123, 202, 111, 106, 119, 220, 201, 208, 221, 233, 102, 107, 118, 212, 109, 209, 222, 205, 219, 230, 234, 215, 228, 217, 231, 213, 223, 232]
+        DS2 = []
+
+        # For federated learning
+        DS1 = [100, 104, 223, 213, 208, 220, 222, 103, 124, 207]
+        # NOR, N: 0 100 103
+        # LBB, L: 1 213 207
+        # RBB, R: 2 124
+        # PVC, V: 3 (213) 208
+        # PAB, /: 4 104
+        # APC, A: 5 220 222 223
 
         mit_pickle_name = db_path + 'python_mit'
         if reduced_DS:
@@ -483,14 +505,24 @@ def load_signal(DS, winL, winR, do_preprocess):
             if int(file[0:3]) in DS:
                 fAnnotations.append(file)        
 
-    MITBIH_classes = ['N', 'L', 'R', 'e', 'j', 'A', 'a', 'J', 'S', 'V', 'E', 'F']#, 'P', '/', 'f', 'u']
-    AAMI_classes = []
-    AAMI_classes.append(['N', 'L', 'R'])                    # N
-    AAMI_classes.append(['A', 'a', 'J', 'S', 'e', 'j', 'V', 'E', 'F'])     # AbN
+    # MITBIH_classes = ['N', 'L', 'R', 'e', 'j', 'A', 'a', 'J', 'S', 'V', 'E', 'F']#, 'P', '/', 'f', 'u']
+    # AAMI_classes = []
+    # AAMI_classes.append(['N', 'L', 'R'])                    # N
+    # # AAMI_classes.append(['A', 'a', 'J', 'S', 'e', 'j', 'V', 'E', 'F'])     # AbN
     # AAMI_classes.append(['A', 'a', 'J', 'S', 'e', 'j'])     # SVEB 
     # AAMI_classes.append(['V', 'E'])                         # VEB
     # AAMI_classes.append(['F'])                              # F
     ##AAMI_classes.append(['P', '/', 'f', 'u'])              # Q
+
+    MITBIH_classes = ['N', 'L', 'R', 'V', '/', 'A']
+    AAMI_classes = [] 
+    AAMI_classes.append(['N']) # NOR
+    AAMI_classes.append(['L']) # LBB
+    AAMI_classes.append(['R']) # RBB
+    AAMI_classes.append(['V']) # PVC
+    AAMI_classes.append(['/']) # PAB
+    # AAMI_classes.append(['E']) # VEB # only in record 207
+    AAMI_classes.append(['A']) # APC
 
     RAW_signals = []
     r_index = 0
